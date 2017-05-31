@@ -107,6 +107,16 @@ func generateConfig(p *v1alpha1.Prometheus, mons map[string]*v1alpha1.ServiceMon
 		},
 	})
 
+	cfg = append(cfg, yaml.MapItem{
+		Key: "remote_write",
+		Value: yaml.MapSlice{
+			{
+				Key:   "url",
+				Value: p.Spec.RemoteWriteUrl,
+			},
+		},
+	})
+
 	return yaml.Marshal(cfg)
 }
 
