@@ -44,7 +44,7 @@ spec:
       serviceAccountName: prometheus-operator
       containers:
        - name: prometheus-operator
-         image: quay.io/coreos/prometheus-operator:v0.9.1
+         image: quay.io/coreos/prometheus-operator:v0.9.3
          args:
          - "--kubelet-service=kube-system/kubelet"
          - "--config-reloader-image=quay.io/coreos/configmap-reload:v0.0.1"
