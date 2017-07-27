@@ -66,6 +66,8 @@ type PrometheusSpec struct {
 	Replicas *int32 `json:"replicas,omitempty"`
 	// Time duration Prometheus shall retain data for.
 	Retention string `json:"retention,omitempty"`
+	// Interval between consecutive evaluations.
+	EvaluationInterval string `json:"evaluationInterval,omitempty"`
 	// The labels to add to any time series or alerts when communicating with
 	// external systems (federation, remote storage, Alertmanager).
 	ExternalLabels map[string]string `json:"externalLabels,omitempty"`
@@ -129,7 +131,7 @@ type PrometheusStatus struct {
 	UnavailableReplicas int32 `json:"unavailableReplicas"`
 }
 
-// AlertingSpec defines paramters for alerting configuration of Prometheus servers.
+// AlertingSpec defines parameters for alerting configuration of Prometheus servers.
 type AlertingSpec struct {
 	// AlertmanagerEndpoints Prometheus should fire alerts against.
 	Alertmanagers []AlertmanagerEndpoints `json:"alertmanagers"`
@@ -139,12 +141,17 @@ type AlertingSpec struct {
 type StorageSpec struct {
 	// Name of the StorageClass to use when requesting storage provisioning. More
 	// info: https://kubernetes.io/docs/user-guide/persistent-volumes/#storageclasses
+	// DEPRECATED
 	Class string `json:"class"`
 	// A label query over volumes to consider for binding.
+	// DEPRECATED
 	Selector *metav1.LabelSelector `json:"selector"`
 	// Resources represents the minimum resources the volume should have. More
 	// info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources
+	// DEPRECATED
 	Resources v1.ResourceRequirements `json:"resources"`
+	// A PVC spec to be used by the Prometheus StatefulSets.
+	VolumeClaimTemplate v1.PersistentVolumeClaim `json:"volumeClaimTemplate,omitempty"`
 }
 
 // AlertmanagerEndpoints defines a selection of a single Endpoints object

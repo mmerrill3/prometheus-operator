@@ -56,12 +56,6 @@ func (f *Framework) MakeBasicAlertmanager(name string, replicas int32) *v1alpha1
 	}
 }
 
-func (f *Framework) MakeAlertmanagerNodePortService(name, group string, nodePort int32) *v1.Service {
-	aMService := f.MakeAlertmanagerService(name, group, v1.ServiceTypeNodePort)
-	aMService.Spec.Ports[0].NodePort = nodePort
-	return aMService
-}
-
 func (f *Framework) MakeAlertmanagerService(name, group string, serviceType v1.ServiceType) *v1.Service {
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -129,17 +123,19 @@ func (f *Framework) CreateAlertmanagerAndWaitUntilReady(ns string, a *v1alpha1.A
 		return errors.Wrap(err, fmt.Sprintf("creating alertmanager %v failed", a.Name))
 	}
 
-	err = WaitForPodsReady(
+	return f.WaitForAlertmanagerReady(ns, a.Name, int(*a.Spec.Replicas))
+}
+
+func (f *Framework) WaitForAlertmanagerReady(ns, name string, replicas int) error {
+	err := WaitForPodsReady(
 		f.KubeClient,
 		ns,
 		5*time.Minute,
-		int(*a.Spec.Replicas),
-		alertmanager.ListOptions(a.Name),
+		replicas,
+		alertmanager.ListOptions(name),
 	)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to create an Alertmanager cluster (%s) with %d instances", a.Name, a.Spec.Replicas))
-	}
-	return nil
+
+	return errors.Wrap(err, fmt.Sprintf("failed to create an Alertmanager cluster (%s) with %d instances", name, replicas))
 }
 
 func (f *Framework) UpdateAlertmanagerAndWaitUntilReady(ns string, a *v1alpha1.Alertmanager) error {

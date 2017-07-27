@@ -14,6 +14,7 @@ This chart bootstraps a [Prometheus](https://github.com/prometheus/prometheus) d
 
 ## Prerequisites
   - Kubernetes 1.4+ with Beta APIs & ThirdPartyResources enabled
+  - [prometheus-operator](https://github.com/coreos/prometheus-operator/blob/master/helm/prometheus-operator/README.md).
 
 ## Installing the Chart
 
@@ -43,6 +44,7 @@ Parameter | Description | Default
 --- | --- | ---
 `alertingEndpoints` | Alertmanagers to which alerts will be sent | `[]`
 `config` | Prometheus configuration directives | `{}`
+`externalLabels` | The labels to add to any time series or alerts when communicating with external systems  | `{}`
 `externalUrl` | External URL at which Prometheus will be reachable | `""`
 `image.repository` | Image | `quay.io/prometheus/prometheus`
 `image.tag` | Image tag | `v1.5.2`
@@ -80,5 +82,6 @@ $ helm install opsgoodness/prometheus --name my-release -f values.yaml
 > **Tip**: You can use the default [values.yaml](values.yaml)
 
 ### Third-party Resource Documentation
-- [prometheus](https://github.com/coreos/prometheus-operator/blob/master/Documentation/prometheus.md)
-- [servicemonitor](https://github.com/coreos/prometheus-operator/blob/master/Documentation/service-monitor.md)
+- [Alertmanager](/Documentation/design.md#alertmanager)
+- [Prometheus](/Documentation/design.md#prometheus)
+- [ServiceMonitor](/Documentation/design.md#servicemonitor)

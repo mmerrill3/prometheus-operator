@@ -3,3 +3,7 @@
 *~
 *.tgz
 requirements.lock
+/pkg/darwin_amd64
+.project
+.settings
+promu
