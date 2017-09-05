@@ -32,6 +32,8 @@ import (
 	"github.com/coreos/prometheus-operator/pkg/alertmanager"
 	"github.com/coreos/prometheus-operator/pkg/analytics"
 	"github.com/coreos/prometheus-operator/pkg/api"
+	"github.com/coreos/prometheus-operator/pkg/k8sutil"
+	"github.com/coreos/prometheus-operator/pkg/migrator"
 	prometheuscontroller "github.com/coreos/prometheus-operator/pkg/prometheus"
 	"github.com/go-kit/kit/log"
 )
@@ -72,39 +74,56 @@ func Main() int {
 
 	po, err := prometheuscontroller.New(cfg, logger.With("component", "prometheusoperator"))
 	if err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprint(os.Stderr, "instantiating prometheus controller failed: ", err)
 		return 1
 	}
 
 	ao, err := alertmanager.New(cfg, logger.With("component", "alertmanageroperator"))
 	if err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprint(os.Stderr, "instantiating alertmanager controller failed: ", err)
 		return 1
 	}
 
 	mux := http.NewServeMux()
 	web, err := api.New(cfg, logger.With("component", "api"))
 	if err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprint(os.Stderr, "instantiating api failed: ", err)
 		return 1
 	}
 
 	web.Register(mux)
 	l, err := net.Listen("tcp", ":8080")
 	if err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprint(os.Stderr, "listening port 8080 failed", err)
 		return 1
 	}
 
 	po.RegisterMetrics(r)
 	ao.RegisterMetrics(r)
 	mux.Handle("/metrics", promhttp.HandlerFor(r, promhttp.HandlerOpts{}))
-
 	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
 	mux.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
 	mux.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
 	mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
 	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
+
+	conf, err := k8sutil.NewClusterConfig(cfg.Host, cfg.TLSInsecure, &cfg.TLSConfig)
+	if err != nil {
+		fmt.Fprint(os.Stderr, "failed to instantiate cluster config: ", err)
+		return 1
+	}
+
+	m, err := migrator.NewMigrator(conf, logger)
+	if err != nil {
+		fmt.Fprint(os.Stderr, "failed to instantiate migrator: ", err)
+		return 1
+	}
+
+	err = m.RunMigration()
+	if err != nil {
+		fmt.Fprint(os.Stderr, "failed to run migrations: ", err)
+		return 1
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	wg, ctx := errgroup.WithContext(ctx)

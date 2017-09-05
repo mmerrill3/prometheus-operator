@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 
 	"github.com/blang/semver"
-	"github.com/coreos/prometheus-operator/pkg/client/monitoring/v1alpha1"
+	monitoringv1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
 	"github.com/pkg/errors"
 )
 
@@ -41,7 +41,7 @@ var (
 	probeTimeoutSeconds int32 = 3
 )
 
-func makeStatefulSet(am *v1alpha1.Alertmanager, old *v1beta1.StatefulSet, config Config) (*v1beta1.StatefulSet, error) {
+func makeStatefulSet(am *monitoringv1.Alertmanager, old *v1beta1.StatefulSet, config Config) (*v1beta1.StatefulSet, error) {
 	// TODO(fabxc): is this the right point to inject defaults?
 	// Ideally we would do it before storing but that's currently not possible.
 	// Potentially an update handler on first insertion.
@@ -79,7 +79,8 @@ func makeStatefulSet(am *v1alpha1.Alertmanager, old *v1beta1.StatefulSet, config
 		statefulset.Spec.Template.Spec.ImagePullSecrets = am.Spec.ImagePullSecrets
 	}
 
-	if vc := am.Spec.Storage; vc == nil {
+	storageSpec := am.Spec.Storage
+	if storageSpec == nil {
 		statefulset.Spec.Template.Spec.Volumes = append(statefulset.Spec.Template.Spec.Volumes, v1.Volume{
 			Name: volumeName(am.Name),
 			VolumeSource: v1.VolumeSource{
@@ -87,31 +88,26 @@ func makeStatefulSet(am *v1alpha1.Alertmanager, old *v1beta1.StatefulSet, config
 			},
 		})
 	} else {
-		pvc := v1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: volumeName(am.Name),
-			},
-			Spec: v1.PersistentVolumeClaimSpec{
-				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources:   vc.Resources,
-				Selector:    vc.Selector,
-			},
-		}
-		if len(vc.Class) > 0 {
-			pvc.ObjectMeta.Annotations = map[string]string{
-				"volume.beta.kubernetes.io/storage-class": vc.Class,
-			}
-		}
-		statefulset.Spec.VolumeClaimTemplates = append(statefulset.Spec.VolumeClaimTemplates, pvc)
+		pvcTemplate := storageSpec.VolumeClaimTemplate
+		pvcTemplate.Name = volumeName(am.Name)
+		pvcTemplate.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+		pvcTemplate.Spec.Resources = storageSpec.VolumeClaimTemplate.Spec.Resources
+		pvcTemplate.Spec.Selector = storageSpec.VolumeClaimTemplate.Spec.Selector
+		statefulset.Spec.VolumeClaimTemplates = append(statefulset.Spec.VolumeClaimTemplates, pvcTemplate)
 	}
 
 	if old != nil {
 		statefulset.Annotations = old.Annotations
 	}
+
+	if !config.StatefulSetUpdatesAvailable {
+		statefulset.Spec.UpdateStrategy = v1beta1.StatefulSetUpdateStrategy{}
+	}
+
 	return statefulset, nil
 }
 
-func makeStatefulSetService(p *v1alpha1.Alertmanager) *v1.Service {
+func makeStatefulSetService(p *monitoringv1.Alertmanager) *v1.Service {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: governingServiceName,
@@ -143,7 +139,7 @@ func makeStatefulSetService(p *v1alpha1.Alertmanager) *v1.Service {
 	return svc
 }
 
-func makeStatefulSetSpec(a *v1alpha1.Alertmanager, config Config) (*v1beta1.StatefulSetSpec, error) {
+func makeStatefulSetSpec(a *monitoringv1.Alertmanager, config Config) (*v1beta1.StatefulSetSpec, error) {
 	image := fmt.Sprintf("%s:%s", a.Spec.BaseImage, a.Spec.Version)
 	versionStr := strings.TrimLeft(a.Spec.Version, "v")
 
@@ -198,6 +194,9 @@ func makeStatefulSetSpec(a *v1alpha1.Alertmanager, config Config) (*v1beta1.Stat
 	return &v1beta1.StatefulSetSpec{
 		ServiceName: governingServiceName,
 		Replicas:    a.Spec.Replicas,
+		UpdateStrategy: v1beta1.StatefulSetUpdateStrategy{
+			Type: v1beta1.RollingUpdateStatefulSetStrategyType,
+		},
 		Template: v1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -281,6 +280,8 @@ func makeStatefulSetSpec(a *v1alpha1.Alertmanager, config Config) (*v1beta1.Stat
 						},
 					},
 				},
+				Tolerations: a.Spec.Tolerations,
+				Affinity:    a.Spec.Affinity,
 			},
 		},
 	}, nil
@@ -298,7 +299,7 @@ func prefixedName(name string) string {
 	return fmt.Sprintf("alertmanager-%s", name)
 }
 
-func subPathForStorage(s *v1alpha1.StorageSpec) string {
+func subPathForStorage(s *monitoringv1.StorageSpec) string {
 	if s == nil {
 		return ""
 	}

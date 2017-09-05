@@ -7,3 +7,6 @@ requirements.lock
 .project
 .settings
 promu
+.idea
+*.iml
+.DS_Store

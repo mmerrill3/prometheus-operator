@@ -29,6 +29,7 @@ container:
 	docker build -t $(REPO):$(TAG) .
 
 e2e-test:
+	go test -timeout 20m -v ./test/migration/ $(TEST_RUN_ARGS) --kubeconfig=$(KUBECONFIG) --operator-image=$(REPO):$(TAG) --namespace=$(NAMESPACE)
 	go test -timeout 20m -v ./test/e2e/ $(TEST_RUN_ARGS) --kubeconfig=$(KUBECONFIG) --operator-image=$(REPO):$(TAG) --namespace=$(NAMESPACE)
 
 e2e-status:
@@ -48,12 +49,13 @@ promu:
 embedmd:
 	@go get github.com/campoy/embedmd
 
-apidocgen:
-	@go install github.com/coreos/prometheus-operator/cmd/apidocgen
+po-docgen:
+	@go install github.com/coreos/prometheus-operator/cmd/po-docgen
 
-docs: embedmd apidocgen
+docs: embedmd po-docgen
 	$(GOPATH)/bin/embedmd -w `find Documentation -name "*.md"`
-	$(GOPATH)/bin/apidocgen pkg/client/monitoring/v1alpha1/types.go > Documentation/api.md
+	$(GOPATH)/bin/po-docgen api pkg/client/monitoring/v1/types.go > Documentation/api.md
+	$(GOPATH)/bin/po-docgen compatibility > Documentation/compatibility.md
 
 generate: jsonnet-docker
 	docker run --rm -v `pwd`:/go/src/github.com/coreos/prometheus-operator po-jsonnet make jsonnet generate-bundle docs

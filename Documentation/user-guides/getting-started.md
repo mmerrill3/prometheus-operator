@@ -31,7 +31,13 @@ rules:
   resources:
   - thirdpartyresources
   verbs:
-  - create
+  - "*"
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - "*"
 - apiGroups:
   - monitoring.coreos.com
   resources:
@@ -63,6 +69,10 @@ rules:
   resources:
   - nodes
   verbs: ["list", "watch"]
+- apiGroups: [""]
+  resources:
+  - namespaces
+  verbs: ["list"]
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -86,7 +96,7 @@ spec:
       - args:
         - --kubelet-service=kube-system/kubelet
         - --config-reloader-image=quay.io/coreos/configmap-reload:v0.0.1
-        image: quay.io/coreos/prometheus-operator:v0.11.0
+        image: quay.io/coreos/prometheus-operator:v0.12.0
         name: prometheus-operator
         ports:
         - containerPort: 8080
@@ -160,7 +170,7 @@ This `Service` object is discovered by a `ServiceMonitor`, which selects in the 
 
 [embedmd]:# (../../example/user-guides/getting-started/example-app-service-monitor.yaml)
 ```yaml
-apiVersion: monitoring.coreos.com/v1alpha1
+apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: example-app
@@ -232,7 +242,7 @@ Finally, a `Prometheus` object defines the `serviceMonitorSelector` to specify w
 
 [embedmd]:# (../../example/user-guides/getting-started/prometheus.yaml)
 ```yaml
-apiVersion: monitoring.coreos.com/v1alpha1
+apiVersion: monitoring.coreos.com/v1
 kind: Prometheus
 metadata:
   name: prometheus

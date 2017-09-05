@@ -59,6 +59,8 @@ Specification of the desired behavior of the Alertmanager cluster. More info: ht
 | paused | If set to true all actions on the underlaying managed objects are not goint to be performed, except for delete actions. | bool | false |
 | nodeSelector | Define which Nodes the Pods are scheduled on. | map[string]string | false |
 | resources | Define resources requests and limits for single Pods. | [v1.ResourceRequirements](https://kubernetes.io/docs/api-reference/v1.6/#resourcerequirements-v1-core) | false |
+| affinity | If specified, the pod's scheduling constraints. | *v1.Affinity | false |
+| tolerations | If specified, the pod's tolerations. | []v1.Toleration | false |
 
 ## AlertmanagerStatus
 
@@ -92,6 +94,7 @@ Endpoint defines a scrapeable endpoint serving Prometheus metrics.
 | path | HTTP path to scrape for metrics. | string | false |
 | scheme | HTTP scheme to use for scraping. | string | false |
 | interval | Interval at which metrics should be scraped | string | false |
+| scrapeTimeout | Timeout after which the scrape is ended | string | false |
 | tlsConfig | TLS configuration to use when scraping the endpoint | *[TLSConfig](#tlsconfig) | false |
 | bearerTokenFile | File to read bearer token for scraping targets. | string | false |
 | honorLabels | HonorLabels chooses the metric's labels on collisions with target labels. | bool | false |
@@ -149,7 +152,8 @@ Specification of the desired behavior of the Prometheus cluster. More info: http
 | nodeSelector | Define which Nodes the Pods are scheduled on. | map[string]string | false |
 | serviceAccountName | ServiceAccountName is the name of the ServiceAccount to use to run the Prometheus Pods. | string | false |
 | secrets | Secrets is a list of Secrets in the same namespace as the Prometheus object, which shall be mounted into the Prometheus Pods. The Secrets are mounted into /etc/prometheus/secrets/<secret-name>. Secrets changes after initial creation of a Prometheus object are not reflected in the running Pods. To change the secrets mounted into the Prometheus Pods, the object must be deleted and recreated with the new list of secrets. | []string | false |
-| tolerations | An optional list of tolerations to determine which tainted nodes the pod can execute on see https://github.com/kubernetes/community/blob/master/contributors/design-proposals/taint-toleration-dedicated.md | [][v1.Toleration](https://kubernetes.io/docs/api-reference/v1.6/#toleration-v1-core) | false |
+| affinity | If specified, the pod's scheduling constraints. | *v1.Affinity | false |
+| tolerations | If specified, the pod's tolerations. | []v1.Toleration | false |
 
 ## PrometheusStatus
 
@@ -188,7 +192,7 @@ ServiceMonitorSpec contains specification parameters for a ServiceMonitor.
 | Field | Description | Scheme | Required |
 | ----- | ----------- | ------ | -------- |
 | jobLabel | The label to use to retrieve the job name from. | string | false |
-| endpoints | A list of endpoints allowed as part of this ServiceMonitor. | [][Endpoint](#endpoint) | false |
+| endpoints | A list of endpoints allowed as part of this ServiceMonitor. | [][Endpoint](#endpoint) | true |
 | selector | Selector to select Endpoints objects. | [metav1.LabelSelector](https://kubernetes.io/docs/api-reference/v1.6/#labelselector-v1-meta) | true |
 | namespaceSelector | Selector to select which namespaces the Endpoints objects are discovered from. | [NamespaceSelector](#namespaceselector) | false |
 
