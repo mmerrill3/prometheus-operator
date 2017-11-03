@@ -2,7 +2,7 @@ job('po-tests-pr') {
     concurrentBuild()
 
     // logRotator(daysToKeep, numberToKeep)
-    logRotator(10, 10)
+    logRotator(30, 10)
 
     parameters {
         stringParam('sha1')
@@ -69,11 +69,6 @@ job('po-tests-pr') {
             onlyIfBuildSucceeds(false)
             onlyIfBuildFails(false)
         }
-        postBuildScripts {
-            archiveArtifacts('build/**/*')
-            onlyIfBuildSucceeds(false)
-            onlyIfBuildFails(false)
-        }
         wsCleanup()
     }
 }
@@ -82,7 +77,7 @@ job('po-tests-master') {
     concurrentBuild()
 
     // logRotator(daysToKeep, numberToKeep)
-    logRotator(30, 30)
+    logRotator(30, 5)
 
     scm {
         git {
@@ -137,11 +132,32 @@ job('po-tests-master') {
             onlyIfBuildSucceeds(false)
             onlyIfBuildFails(false)
         }
-        postBuildScripts {
-            archiveArtifacts('build/**/*')
-            onlyIfBuildSucceeds(false)
-            onlyIfBuildFails(false)
+        slackNotifier {
+            room('#team-monitoring')
+            teamDomain('coreos')
+            authTokenCredentialId('team-monitoring-slack-jenkins')
+            notifyFailure(true)
+            notifyRegression(true)
+            notifyRepeatedFailure(true)
         }
+        wsCleanup()
+    }
+}
+
+job('cleanup') {
+    // logRotator(daysToKeep, numberToKeep)
+    logRotator(30, 2)
+
+    triggers {
+        cron('@weekly')
+    }
+
+    steps {
+        shell('docker system prune -a -f')
+        shell('docker system df')
+    }
+
+    publishers {
         slackNotifier {
             room('#team-monitoring')
             teamDomain('coreos')

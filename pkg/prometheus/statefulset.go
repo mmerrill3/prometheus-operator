@@ -37,10 +37,9 @@ import (
 
 const (
 	governingServiceName = "prometheus-operated"
-	DefaultVersion       = "v1.7.1"
+	DefaultVersion       = "v2.0.0-rc.1"
 	defaultRetention     = "24h"
-
-	configMapsFilename = "configmaps.json"
+	configMapsFilename   = "configmaps.json"
 )
 
 var (
@@ -65,7 +64,9 @@ var (
 		"v1.6.3",
 		"v1.7.0",
 		"v1.7.1",
-		"v2.0.0-beta.0",
+		"v1.7.2",
+		"v1.8.0",
+		"v2.0.0-rc.1",
 	}
 )
 
@@ -80,8 +81,12 @@ func makeStatefulSet(p monitoringv1.Prometheus, old *v1beta1.StatefulSet, config
 	if p.Spec.Version == "" {
 		p.Spec.Version = DefaultVersion
 	}
-	if p.Spec.Replicas != nil && *p.Spec.Replicas < minReplicas {
+	if p.Spec.Replicas == nil {
 		p.Spec.Replicas = &minReplicas
+	}
+	intZero := int32(0)
+	if p.Spec.Replicas != nil && *p.Spec.Replicas < 0 {
+		p.Spec.Replicas = &intZero
 	}
 	if p.Spec.Retention == "" {
 		p.Spec.Retention = defaultRetention
@@ -99,11 +104,22 @@ func makeStatefulSet(p monitoringv1.Prometheus, old *v1beta1.StatefulSet, config
 		return nil, errors.Wrap(err, "make StatefulSet spec")
 	}
 
+	boolTrue := true
 	statefulset := &v1beta1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        prefixedName(p.Name),
-			Labels:      p.ObjectMeta.Labels,
+			Labels:      config.Labels.Merge(p.ObjectMeta.Labels),
 			Annotations: p.ObjectMeta.Annotations,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         p.APIVersion,
+					BlockOwnerDeletion: &boolTrue,
+					Controller:         &boolTrue,
+					Kind:               p.Kind,
+					Name:               p.Name,
+					UID:                p.UID,
+				},
+			},
 		},
 		Spec: *spec,
 	}
@@ -130,26 +146,16 @@ func makeStatefulSet(p monitoringv1.Prometheus, old *v1beta1.StatefulSet, config
 
 	if old != nil {
 		statefulset.Annotations = old.Annotations
-	}
 
-	if !config.StatefulSetUpdatesAvailable {
-		statefulset.Spec.UpdateStrategy = v1beta1.StatefulSetUpdateStrategy{}
-
-		if old != nil {
-			// Mounted volumes are not reconciled as StatefulSets do not allow
-			// modification of the PodTemplate.
-			//
-			// TODO(brancz): remove this when dropping 1.6 compatibility.
-			statefulset.Spec.Template.Spec.Containers[0].VolumeMounts = old.Spec.Template.Spec.Containers[0].VolumeMounts
-			statefulset.Spec.Template.Spec.Volumes = old.Spec.Template.Spec.Volumes
-		}
+		// Updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden.
+		statefulset.Spec.PodManagementPolicy = old.Spec.PodManagementPolicy
 	}
 
 	return statefulset, nil
 }
 
-func makeEmptyConfig(name string, configMaps []*v1.ConfigMap) (*v1.Secret, error) {
-	s, err := makeConfigSecret(name, configMaps)
+func makeEmptyConfig(p *monitoringv1.Prometheus, configMaps []*v1.ConfigMap, config Config) (*v1.Secret, error) {
+	s, err := makeConfigSecret(p, configMaps, config)
 	if err != nil {
 		return nil, err
 	}
@@ -220,16 +226,27 @@ func makeRuleConfigMapListFile(configMaps []*v1.ConfigMap) ([]byte, error) {
 	return json.Marshal(cml)
 }
 
-func makeConfigSecret(name string, configMaps []*v1.ConfigMap) (*v1.Secret, error) {
+func makeConfigSecret(p *monitoringv1.Prometheus, configMaps []*v1.ConfigMap, config Config) (*v1.Secret, error) {
 	b, err := makeRuleConfigMapListFile(configMaps)
 	if err != nil {
 		return nil, err
 	}
 
+	boolTrue := true
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   configSecretName(name),
-			Labels: managedByOperatorLabels,
+			Name:   configSecretName(p.Name),
+			Labels: config.Labels.Merge(managedByOperatorLabels),
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         p.APIVersion,
+					BlockOwnerDeletion: &boolTrue,
+					Controller:         &boolTrue,
+					Kind:               p.Kind,
+					Name:               p.Name,
+					UID:                p.UID,
+				},
+			},
 		},
 		Data: map[string][]byte{
 			configFilename:     []byte{},
@@ -238,13 +255,13 @@ func makeConfigSecret(name string, configMaps []*v1.ConfigMap) (*v1.Secret, erro
 	}, nil
 }
 
-func makeStatefulSetService(p *monitoringv1.Prometheus) *v1.Service {
+func makeStatefulSetService(p *monitoringv1.Prometheus, config Config) *v1.Service {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: governingServiceName,
-			Labels: map[string]string{
+			Labels: config.Labels.Merge(map[string]string{
 				"operated-prometheus": "true",
-			},
+			}),
 		},
 		Spec: v1.ServiceSpec{
 			ClusterIP: "None",
@@ -434,25 +451,63 @@ func makeStatefulSetSpec(p monitoringv1.Prometheus, c *Config, ruleConfigMaps []
 		"-rule-volume-dir=/etc/prometheus/rules",
 	}
 
-	probeHandler := v1.Handler{
-		HTTPGet: &v1.HTTPGetAction{
-			Path: path.Clean(webRoutePrefix + "/status"),
-			Port: intstr.FromString("web"),
-		},
+	var livenessProbeHandler v1.Handler
+	var readinessProbeHandler v1.Handler
+	var livenessProbeInitialDelaySeconds int32
+	if (version.Major == 1 && version.Minor >= 8) || version.Major == 2 {
+		livenessProbeHandler = v1.Handler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: path.Clean(webRoutePrefix + "/-/healthy"),
+				Port: intstr.FromString("web"),
+			},
+		}
+		readinessProbeHandler = v1.Handler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: path.Clean(webRoutePrefix + "/-/ready"),
+				Port: intstr.FromString("web"),
+			},
+		}
+		livenessProbeInitialDelaySeconds = 30
+	} else {
+		livenessProbeHandler = v1.Handler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: path.Clean(webRoutePrefix + "/status"),
+				Port: intstr.FromString("web"),
+			},
+		}
+		readinessProbeHandler = livenessProbeHandler
+		// For larger servers, restoring a checkpoint on startup may take quite a bit of time.
+		// Wait up to 5 minutes.
+		livenessProbeInitialDelaySeconds = 300
 	}
 
+	podAnnotations := map[string]string{}
+	podLabels := map[string]string{}
+	if p.Spec.PodMetadata != nil {
+		if p.Spec.PodMetadata.Labels != nil {
+			for k, v := range p.Spec.PodMetadata.Labels {
+				podLabels[k] = v
+			}
+		}
+		if p.Spec.PodMetadata.Annotations != nil {
+			for k, v := range p.Spec.PodMetadata.Annotations {
+				podAnnotations[k] = v
+			}
+		}
+	}
+	podLabels["app"] = "prometheus"
+	podLabels["prometheus"] = p.Name
 	return &v1beta1.StatefulSetSpec{
-		ServiceName: governingServiceName,
-		Replicas:    p.Spec.Replicas,
+		ServiceName:         governingServiceName,
+		Replicas:            p.Spec.Replicas,
+		PodManagementPolicy: v1beta1.ParallelPodManagement,
 		UpdateStrategy: v1beta1.StatefulSetUpdateStrategy{
 			Type: v1beta1.RollingUpdateStatefulSetStrategyType,
 		},
 		Template: v1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{
-					"app":        "prometheus",
-					"prometheus": p.Name,
-				},
+				Labels:      c.Labels.Merge(podLabels),
+				Annotations: podAnnotations,
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
@@ -469,16 +524,14 @@ func makeStatefulSetSpec(p monitoringv1.Prometheus, c *Config, ruleConfigMaps []
 						Args:         promArgs,
 						VolumeMounts: promVolumeMounts,
 						LivenessProbe: &v1.Probe{
-							Handler: probeHandler,
-							// For larger servers, restoring a checkpoint on startup may take quite a bit of time.
-							// Wait up to 5 minutes.
-							InitialDelaySeconds: 300,
+							Handler:             livenessProbeHandler,
+							InitialDelaySeconds: livenessProbeInitialDelaySeconds,
 							PeriodSeconds:       5,
 							TimeoutSeconds:      probeTimeoutSeconds,
 							FailureThreshold:    10,
 						},
 						ReadinessProbe: &v1.Probe{
-							Handler:          probeHandler,
+							Handler:          readinessProbeHandler,
 							TimeoutSeconds:   probeTimeoutSeconds,
 							PeriodSeconds:    5,
 							FailureThreshold: 6,

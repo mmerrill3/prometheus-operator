@@ -1,3 +1,8 @@
+<br>
+<div class="alert alert-info" role="alert">
+    <i class="fa fa-exclamation-triangle"></i><b> Note:</b> Starting with v0.12.0, Prometheus Operator requires use of Kubernetes v1.7.x and up.
+</div>
+
 # Cluster Monitoring
 
 This guide is intended to give an introduction to all the parts required to start monitoring a Kubernetes cluster with Prometheus using the Prometheus Operator.
@@ -44,7 +49,7 @@ spec:
       - args:
         - --kubelet-service=kube-system/kubelet
         - --config-reloader-image=quay.io/coreos/configmap-reload:v0.0.1
-        image: quay.io/coreos/prometheus-operator:v0.12.0
+        image: quay.io/coreos/prometheus-operator:v0.14.1
         name: prometheus-operator
         ports:
         - containerPort: 8080
@@ -133,10 +138,10 @@ spec:
       hostNetwork: true
       hostPID: true
       containers:
-      - image:  quay.io/prometheus/node-exporter:v0.14.0
+      - image: quay.io/prometheus/node-exporter:v0.15.0
         args:
-        - "-collector.procfs=/host/proc"
-        - "-collector.sysfs=/host/sys"
+        - "--path.procfs=/host/proc"
+        - "--path.sysfs=/host/sys"
         name: node-exporter
         ports:
         - containerPort: 9100
@@ -156,6 +161,9 @@ spec:
         - name: sys
           readOnly: true
           mountPath: /host/sys
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
       volumes:
       - name: proc
         hostPath:
@@ -217,13 +225,6 @@ spec:
             port: 8080
           initialDelaySeconds: 5
           timeoutSeconds: 5
-        resources:
-          requests:
-            memory: 100Mi
-            cpu: 100m
-          limits:
-            memory: 200Mi
-            cpu: 200m
       - name: addon-resizer
         image: gcr.io/google_containers/addon-resizer:1.0
         resources:
@@ -291,7 +292,7 @@ metadata:
     prometheus: k8s
 spec:
   replicas: 2
-  version: v1.7.0
+  version: v2.0.0-rc.1
   serviceAccountName: prometheus-k8s
   serviceMonitorSelector:
     matchExpressions:
@@ -466,7 +467,7 @@ metadata:
     alertmanager: main
 spec:
   replicas: 3
-  version: v0.7.1
+  version: v0.9.1
 ```
 
 Read more in the [alerting guide](alerting.md) on how to configure the Alertmanager as it will not spin up unless it has a valid configuration mounted through a `Secret`. Note that the `Secret` has to be in the same namespace as the `Alertmanager` resource as well as have the name `alertmanager-<name-of-alertmanager-object` and the key of the configuration is `alertmanager.yaml`.

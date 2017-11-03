@@ -33,7 +33,7 @@ import (
 
 const (
 	governingServiceName = "alertmanager-operated"
-	defaultVersion       = "v0.7.1"
+	defaultVersion       = "v0.9.1"
 )
 
 var (
@@ -52,8 +52,12 @@ func makeStatefulSet(am *monitoringv1.Alertmanager, old *v1beta1.StatefulSet, co
 	if am.Spec.Version == "" {
 		am.Spec.Version = defaultVersion
 	}
-	if am.Spec.Replicas != nil && *am.Spec.Replicas < minReplicas {
+	if am.Spec.Replicas == nil {
 		am.Spec.Replicas = &minReplicas
+	}
+	intZero := int32(0)
+	if am.Spec.Replicas != nil && *am.Spec.Replicas < 0 {
+		am.Spec.Replicas = &intZero
 	}
 	if am.Spec.Resources.Requests == nil {
 		am.Spec.Resources.Requests = v1.ResourceList{}
@@ -66,11 +70,23 @@ func makeStatefulSet(am *monitoringv1.Alertmanager, old *v1beta1.StatefulSet, co
 	if err != nil {
 		return nil, err
 	}
+
+	boolTrue := true
 	statefulset := &v1beta1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        prefixedName(am.Name),
-			Labels:      am.ObjectMeta.Labels,
+			Labels:      config.Labels.Merge(am.ObjectMeta.Labels),
 			Annotations: am.ObjectMeta.Annotations,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         am.APIVersion,
+					BlockOwnerDeletion: &boolTrue,
+					Controller:         &boolTrue,
+					Kind:               am.Kind,
+					Name:               am.Name,
+					UID:                am.UID,
+				},
+			},
 		},
 		Spec: *spec,
 	}
@@ -100,20 +116,16 @@ func makeStatefulSet(am *monitoringv1.Alertmanager, old *v1beta1.StatefulSet, co
 		statefulset.Annotations = old.Annotations
 	}
 
-	if !config.StatefulSetUpdatesAvailable {
-		statefulset.Spec.UpdateStrategy = v1beta1.StatefulSetUpdateStrategy{}
-	}
-
 	return statefulset, nil
 }
 
-func makeStatefulSetService(p *monitoringv1.Alertmanager) *v1.Service {
+func makeStatefulSetService(p *monitoringv1.Alertmanager, config Config) *v1.Service {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: governingServiceName,
-			Labels: map[string]string{
+			Labels: config.Labels.Merge(map[string]string{
 				"operated-alertmanager": "true",
-			},
+			}),
 		},
 		Spec: v1.ServiceSpec{
 			ClusterIP: "None",
@@ -186,6 +198,23 @@ func makeStatefulSetSpec(a *monitoringv1.Alertmanager, config Config) (*v1beta1.
 		},
 	}
 
+	podAnnotations := map[string]string{}
+	podLabels := map[string]string{}
+	if a.Spec.PodMetadata != nil {
+		if a.Spec.PodMetadata.Labels != nil {
+			for k, v := range a.Spec.PodMetadata.Labels {
+				podLabels[k] = v
+			}
+		}
+		if a.Spec.PodMetadata.Annotations != nil {
+			for k, v := range a.Spec.PodMetadata.Annotations {
+				podAnnotations[k] = v
+			}
+		}
+	}
+	podLabels["app"] = "alertmanager"
+	podLabels["alertmanager"] = a.Name
+
 	for i := int32(0); i < *a.Spec.Replicas; i++ {
 		amArgs = append(amArgs, fmt.Sprintf("-mesh.peer=%s-%d.%s.%s.svc", prefixedName(a.Name), i, governingServiceName, a.Namespace))
 	}
@@ -199,10 +228,8 @@ func makeStatefulSetSpec(a *monitoringv1.Alertmanager, config Config) (*v1beta1.
 		},
 		Template: v1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{
-					"app":          "alertmanager",
-					"alertmanager": a.Name,
-				},
+				Labels:      config.Labels.Merge(podLabels),
+				Annotations: podAnnotations,
 			},
 			Spec: v1.PodSpec{
 				NodeSelector:                  a.Spec.NodeSelector,

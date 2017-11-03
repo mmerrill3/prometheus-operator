@@ -111,6 +111,10 @@ alertmanager:
   #       storage: 2Gi
   #   selector: {}
 
+## If true, create & use RBAC resources
+##
+rbacEnable: true
+
 prometheus:
   ## Alertmanagers to which alerts will be sent
   ## Ref: https://github.com/coreos/prometheus-operator/blob/master/Documentation/api.md#alertmanagerendpoints
@@ -239,7 +243,7 @@ prometheus:
   ##
   serviceMonitorsSelector: {}
 
-  ## ServiceMonitor TPRs to create & be scraped by the Prometheus instance.
+  ## ServiceMonitor CRDs to create & be scraped by the Prometheus instance.
   ## Ref: https://github.com/coreos/prometheus-operator/blob/master/Documentation/service-monitor.md
   ##
   serviceMonitors: []

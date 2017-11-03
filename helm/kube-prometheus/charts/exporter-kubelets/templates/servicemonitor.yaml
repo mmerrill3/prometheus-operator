@@ -1,8 +1,7 @@
-apiVersion: monitoring.coreos.com/v1alpha1
+apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: prometheus
     chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
     component: kubelets
     heritage: "{{ .Release.Service }}"
@@ -30,4 +29,3 @@ spec:
   - port: cadvisor
     interval: 30s
     honorLabels: true
-        

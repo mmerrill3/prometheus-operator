@@ -10,3 +10,5 @@ promu
 .idea
 *.iml
 .DS_Store
+__pycache__
+.env/

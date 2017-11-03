@@ -24,15 +24,15 @@ import (
 type Prometheus struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object’s metadata. More info:
-	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the Prometheus cluster. More info:
-	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 	Spec PrometheusSpec `json:"spec"`
 	// Most recent observed status of the Prometheus cluster. Read-only. Not
 	// included when requesting from the apiserver, only from the Prometheus
 	// Operator API itself. More info:
-	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 	Status *PrometheusStatus `json:"status,omitempty"`
 }
 
@@ -40,15 +40,19 @@ type Prometheus struct {
 type PrometheusList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of Prometheuses
 	Items []*Prometheus `json:"items"`
 }
 
 // Specification of the desired behavior of the Prometheus cluster. More info:
-// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 type PrometheusSpec struct {
+	// Standard object’s metadata. More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	// Metadata Labels and Annotations gets propagated to the prometheus pods.
+	PodMetadata *metav1.ObjectMeta `json:"podMetadata,omitempty"`
 	// ServiceMonitors to be selected for target discovery.
 	ServiceMonitorSelector *metav1.LabelSelector `json:"serviceMonitorSelector,omitempty"`
 	// Version of Prometheus to be deployed.
@@ -66,6 +70,8 @@ type PrometheusSpec struct {
 	Replicas *int32 `json:"replicas,omitempty"`
 	// Time duration Prometheus shall retain data for.
 	Retention string `json:"retention,omitempty"`
+	// Interval between consecutive scrapes.
+	ScrapeInterval string `json:"scrapeInterval,omitempty"`
 	// Interval between consecutive evaluations.
 	EvaluationInterval string `json:"evaluationInterval,omitempty"`
 	// The labels to add to any time series or alerts when communicating with
@@ -110,7 +116,7 @@ type PrometheusSpec struct {
 // Most recent observed status of the Prometheus cluster. Read-only. Not
 // included when requesting from the apiserver, only from the Prometheus
 // Operator API itself. More info:
-// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 type PrometheusStatus struct {
 	// Represents whether any actions on the underlaying managed objects are
 	// being performed. Only delete actions will be performed.
@@ -170,7 +176,7 @@ type AlertmanagerEndpoints struct {
 type ServiceMonitor struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object’s metadata. More info:
-	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of desired Service selection for target discrovery by
 	// Prometheus.
@@ -199,6 +205,8 @@ type Endpoint struct {
 	Path string `json:"path,omitempty"`
 	// HTTP scheme to use for scraping.
 	Scheme string `json:"scheme,omitempty"`
+	// Optional HTTP URL parameters
+	Params map[string][]string `json:"params,omitempty"`
 	// Interval at which metrics should be scraped
 	Interval string `json:"interval,omitempty"`
 	// Timeout after which the scrape is ended
@@ -241,7 +249,7 @@ type TLSConfig struct {
 type ServiceMonitorList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of ServiceMonitors
 	Items []*ServiceMonitor `json:"items"`
@@ -251,21 +259,25 @@ type ServiceMonitorList struct {
 type Alertmanager struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object’s metadata. More info:
-	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the Alertmanager cluster. More info:
-	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 	Spec AlertmanagerSpec `json:"spec"`
 	// Most recent observed status of the Alertmanager cluster. Read-only. Not
 	// included when requesting from the apiserver, only from the Prometheus
 	// Operator API itself. More info:
-	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 	Status *AlertmanagerStatus `json:"status,omitempty"`
 }
 
 // Specification of the desired behavior of the Alertmanager cluster. More info:
-// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 type AlertmanagerSpec struct {
+	// Standard object’s metadata. More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	// Metadata Labels and Annotations gets propagated to the prometheus pods.
+	PodMetadata *metav1.ObjectMeta `json:"podMetadata,omitempty"`
 	// Version the cluster should be on.
 	Version string `json:"version,omitempty"`
 	// Base image that is used to deploy pods.
@@ -307,7 +319,7 @@ type AlertmanagerSpec struct {
 type AlertmanagerList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of Alertmanagers
 	Items []Alertmanager `json:"items"`
@@ -316,7 +328,7 @@ type AlertmanagerList struct {
 // Most recent observed status of the Alertmanager cluster. Read-only. Not
 // included when requesting from the apiserver, only from the Prometheus
 // Operator API itself. More info:
-// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 type AlertmanagerStatus struct {
 	// Represents whether any actions on the underlaying managed objects are
 	// being performed. Only delete actions will be performed.

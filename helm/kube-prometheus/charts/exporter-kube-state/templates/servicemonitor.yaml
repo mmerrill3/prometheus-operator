@@ -1,8 +1,7 @@
-apiVersion: monitoring.coreos.com/v1alpha1
+apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: prometheus
     chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
     component: kube-state
     heritage: "{{ .Release.Service }}"
@@ -19,5 +18,6 @@ spec:
     matchNames:
       - {{ .Release.Namespace | quote }}
   endpoints:
-  - port: {{ .Values.service.name }}
+  - port: {{ .Values.kube_state_metrics.service.name }}
     interval: 15s
+    honorLabels: true

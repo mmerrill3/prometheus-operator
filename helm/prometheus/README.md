@@ -59,6 +59,7 @@ Parameter | Description | Default
 `retention` | How long to retain metrics | `24h`
 `routePrefix` | Prefix used to register routes, overriding externalUrl route | `/`
 `rules` | Prometheus alerting & recording rules | `{}`
+`rulesSelector` | Rules ConfigMap selector | `{}`
 `secrets` | List of Secrets in the same namespace as the Prometheus object, which shall be mounted into the Prometheus Pods. | `{}`
 `service.annotations` | Annotations to be added to the Prometheus Service | `{}`
 `service.clusterIP` | Cluster-internal IP address for Prometheus Service | `""`
@@ -68,13 +69,14 @@ Parameter | Description | Default
 `service.nodePort` | Port to expose Prometheus Service on each node | `39090`
 `service.type` | Prometheus Service type | `ClusterIP`
 `serviceMonitors` | ServiceMonitor third-party resources to create & be scraped by this Prometheus instance | `[]`
+`serviceMonitorsSelector` | ServiceMonitor ConfigMap selector | `{}`
 `storageSpec` | Prometheus StorageSpec for persistent data | `{}`
 
 Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`. For example,
 $ helm install opsgoodness/prometheus --name my-release --set externalUrl=http://prometheus.example.com
-```
 
-Alternatively, a YAML file that specifies the values for the above parameters can be provided while installing the chart. For example,
+
+Alternatively, a YAML file that specifies the values for the above parameters can be provided while installing the chart. For example:
 
 ```console
 $ helm install opsgoodness/prometheus --name my-release -f values.yaml

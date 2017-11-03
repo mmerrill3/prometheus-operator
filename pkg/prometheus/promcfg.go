@@ -63,6 +63,11 @@ func generateConfig(p *v1.Prometheus, mons map[string]*v1.ServiceMonitor, ruleCo
 
 	cfg := yaml.MapSlice{}
 
+	scrapeInterval := "30s"
+	if p.Spec.ScrapeInterval != "" {
+		scrapeInterval = p.Spec.ScrapeInterval
+	}
+
 	evaluationInterval := "30s"
 	if p.Spec.EvaluationInterval != "" {
 		evaluationInterval = p.Spec.EvaluationInterval
@@ -72,7 +77,7 @@ func generateConfig(p *v1.Prometheus, mons map[string]*v1.ServiceMonitor, ruleCo
 		Key: "global",
 		Value: yaml.MapSlice{
 			{Key: "evaluation_interval", Value: evaluationInterval},
-			{Key: "scrape_interval", Value: "30s"},
+			{Key: "scrape_interval", Value: scrapeInterval},
 			{Key: "external_labels", Value: stringMapToMapSlice(p.Spec.ExternalLabels)},
 		},
 	})
@@ -80,7 +85,7 @@ func generateConfig(p *v1.Prometheus, mons map[string]*v1.ServiceMonitor, ruleCo
 	if ruleConfigMaps > 0 {
 		configMaps := make([]string, ruleConfigMaps)
 		for i := 0; i < ruleConfigMaps; i++ {
-			configMaps[i] = configMapRuleFileFolder(i) + "*.rules"
+			configMaps[i] = configMapRuleFileFolder(i) + "*"
 		}
 		cfg = append(cfg, yaml.MapItem{
 			Key:   "rule_files",
@@ -174,6 +179,9 @@ func generateServiceMonitorConfig(version semver.Version, m *v1.ServiceMonitor, 
 	}
 	if ep.Path != "" {
 		cfg = append(cfg, yaml.MapItem{Key: "metrics_path", Value: ep.Path})
+	}
+	if ep.Params != nil {
+		cfg = append(cfg, yaml.MapItem{Key: "params", Value: ep.Params})
 	}
 	if ep.Scheme != "" {
 		cfg = append(cfg, yaml.MapItem{Key: "scheme", Value: ep.Scheme})
