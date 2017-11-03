@@ -553,7 +553,6 @@ func makeStatefulSetSpec(p monitoringv1.Prometheus, c *Config, ruleConfigMaps []
 				SecurityContext:               &securityContext,
 				ServiceAccountName:            p.Spec.ServiceAccountName,
 				NodeSelector:                  p.Spec.NodeSelector,
-				Tolerations:                   p.Spec.Tolerations,
 				TerminationGracePeriodSeconds: &terminationGracePeriod,
 				Volumes:     volumes,
 				Tolerations: p.Spec.Tolerations,
