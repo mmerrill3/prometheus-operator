@@ -1,5 +1,5 @@
 REPO?=080385600816.dkr.ecr.us-east-1.amazonaws.com/prometheus-operator
-TAG?=0.12.0
+TAG?=0.14.1
 NAMESPACE?=po-e2e-$(shell LC_CTYPE=C tr -dc a-z0-9 < /dev/urandom | head -c 13 ; echo '')
 KUBECONFIG?=$(HOME)/.kube/config
 
