@@ -23,11 +23,11 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 
 	"github.com/blang/semver"
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
@@ -37,9 +37,14 @@ import (
 
 const (
 	governingServiceName = "prometheus-operated"
-	DefaultVersion       = "v2.0.0-rc.1"
+	DefaultVersion       = "v2.0.0"
 	defaultRetention     = "24h"
 	configMapsFilename   = "configmaps.json"
+	prometheusConfDir    = "/etc/prometheus/config"
+	prometheusConfFile   = prometheusConfDir + "/prometheus.yaml"
+	prometheusStorageDir = "/var/prometheus/data"
+	prometheusRulesDir   = "/etc/prometheus/rules"
+	prometheusSecretsDir = "/etc/prometheus/secrets/"
 )
 
 var (
@@ -66,7 +71,7 @@ var (
 		"v1.7.1",
 		"v1.7.2",
 		"v1.8.0",
-		"v2.0.0-rc.1",
+		"v2.0.0",
 	}
 )
 
@@ -300,10 +305,9 @@ func makeStatefulSetSpec(p monitoringv1.Prometheus, c *Config, ruleConfigMaps []
 		promArgs = append(promArgs,
 			"-storage.local.retention="+p.Spec.Retention,
 			"-storage.local.num-fingerprint-mutexes=4096",
-			"-storage.local.path=/var/prometheus/data",
+			fmt.Sprintf("-storage.local.path=%s", prometheusStorageDir),
 			"-storage.local.chunk-encoding-version=2",
-			"-config.file=/etc/prometheus/config/prometheus.yaml",
-		)
+			fmt.Sprintf("-config.file=%s", prometheusConfFile))
 		// We attempt to specify decent storage tuning flags based on how much the
 		// requested memory can fit. The user has to specify an appropriate buffering
 		// in memory limits to catch increased memory usage during query bursts.
@@ -342,8 +346,8 @@ func makeStatefulSetSpec(p monitoringv1.Prometheus, c *Config, ruleConfigMaps []
 		// on a best effort basis.
 
 		promArgs = append(promArgs,
-			"-config.file=/etc/prometheus/config/prometheus.yaml",
-			"-storage.tsdb.path=/var/prometheus/data",
+			fmt.Sprintf("-config.file=%s", prometheusConfFile),
+			fmt.Sprintf("-storage.tsdb.path=%s", prometheusStorageDir),
 			"-storage.tsdb.retention="+p.Spec.Retention,
 			"-web.enable-lifecycle",
 		)
@@ -403,16 +407,16 @@ func makeStatefulSetSpec(p monitoringv1.Prometheus, c *Config, ruleConfigMaps []
 		{
 			Name:      "config",
 			ReadOnly:  true,
-			MountPath: "/etc/prometheus/config",
+			MountPath: prometheusConfDir,
 		},
 		{
 			Name:      "rules",
 			ReadOnly:  true,
-			MountPath: "/etc/prometheus/rules",
+			MountPath: prometheusRulesDir,
 		},
 		{
 			Name:      volumeName(p.Name),
-			MountPath: "/var/prometheus/data",
+			MountPath: prometheusStorageDir,
 			SubPath:   subPathForStorage(p.Spec.Storage),
 		},
 	}
@@ -429,7 +433,7 @@ func makeStatefulSetSpec(p monitoringv1.Prometheus, c *Config, ruleConfigMaps []
 		promVolumeMounts = append(promVolumeMounts, v1.VolumeMount{
 			Name:      "secret-" + s,
 			ReadOnly:  true,
-			MountPath: "/etc/prometheus/secrets/" + s,
+			MountPath: prometheusSecretsDir + s,
 		})
 	}
 
@@ -437,18 +441,18 @@ func makeStatefulSetSpec(p monitoringv1.Prometheus, c *Config, ruleConfigMaps []
 		{
 			Name:      "config",
 			ReadOnly:  true,
-			MountPath: "/etc/prometheus/config",
+			MountPath: prometheusConfDir,
 		},
 		{
 			Name:      "rules",
-			MountPath: "/etc/prometheus/rules",
+			MountPath: prometheusRulesDir,
 		},
 	}
 
 	configReloadArgs := []string{
 		fmt.Sprintf("-reload-url=%s", localReloadURL),
-		"-config-volume-dir=/etc/prometheus/config",
-		"-rule-volume-dir=/etc/prometheus/rules",
+		fmt.Sprintf("-config-volume-dir=%s", prometheusConfDir),
+		fmt.Sprintf("-rule-volume-dir=%s", prometheusRulesDir),
 	}
 
 	var livenessProbeHandler v1.Handler

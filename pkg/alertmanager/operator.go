@@ -28,6 +28,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
 	extensionsobj "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,8 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -69,6 +69,7 @@ type Config struct {
 	AlertmanagerDefaultBaseImage string
 	Namespace                    string
 	Labels                       prometheusoperator.Labels
+	CrdKinds                     monitoringv1.CrdKinds
 	CrdGroup                     string
 }
 
@@ -84,7 +85,7 @@ func New(c prometheusoperator.Config, logger log.Logger) (*Operator, error) {
 		return nil, errors.Wrap(err, "instantiating kubernetes client failed")
 	}
 
-	mclient, err := monitoring.NewForConfig(c.CrdGroup, cfg)
+	mclient, err := monitoring.NewForConfig(&c.CrdKinds, c.CrdGroup, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "instantiating monitoring client failed")
 	}
@@ -106,6 +107,7 @@ func New(c prometheusoperator.Config, logger log.Logger) (*Operator, error) {
 			AlertmanagerDefaultBaseImage: c.AlertmanagerDefaultBaseImage,
 			Namespace:                    c.Namespace,
 			CrdGroup:                     c.CrdGroup,
+			CrdKinds:                     c.CrdKinds,
 			Labels:                       c.Labels,
 		},
 	}
@@ -118,7 +120,7 @@ func New(c prometheusoperator.Config, logger log.Logger) (*Operator, error) {
 		&monitoringv1.Alertmanager{}, resyncPeriod, cache.Indexers{},
 	)
 	o.ssetInf = cache.NewSharedIndexInformer(
-		cache.NewListWatchFromClient(o.kclient.AppsV1beta1().RESTClient(), "statefulsets", o.config.Namespace, nil),
+		cache.NewListWatchFromClient(o.kclient.AppsV1beta1().RESTClient(), "statefulsets", o.config.Namespace, fields.Everything()),
 		&v1beta1.StatefulSet{}, resyncPeriod, cache.Indexers{},
 	)
 
@@ -524,7 +526,7 @@ func (c *Operator) createCRDs() error {
 	}
 
 	crds := []*extensionsobj.CustomResourceDefinition{
-		k8sutil.NewAlertmanagerCustomResourceDefinition(c.config.CrdGroup, c.config.Labels.LabelsMap),
+		k8sutil.NewAlertmanagerCustomResourceDefinition(c.config.CrdKinds.Alertmanager, c.config.CrdGroup, c.config.Labels.LabelsMap),
 	}
 
 	crdClient := c.crdclient.ApiextensionsV1beta1().CustomResourceDefinitions()

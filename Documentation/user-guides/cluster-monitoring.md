@@ -49,7 +49,7 @@ spec:
       - args:
         - --kubelet-service=kube-system/kubelet
         - --config-reloader-image=quay.io/coreos/configmap-reload:v0.0.1
-        image: quay.io/coreos/prometheus-operator:v0.14.1
+        image: quay.io/coreos/prometheus-operator:v0.15.0
         name: prometheus-operator
         ports:
         - containerPort: 8080
@@ -292,7 +292,7 @@ metadata:
     prometheus: k8s
 spec:
   replicas: 2
-  version: v2.0.0-rc.1
+  version: v2.0.0
   serviceAccountName: prometheus-k8s
   serviceMonitorSelector:
     matchExpressions:
